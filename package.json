@@ -2,7 +2,7 @@
 	"name": "obsidian-editorconfig-plugin",
 	"version": "1.0.0",
 	"description": "Use editor config to format markdown files.",
-	"main": "main.js",
+	"main": "src/main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
