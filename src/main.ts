@@ -6,6 +6,7 @@ import { FormattingCoordinator } from "./services/FormattingCoordinator";
 import { TextDiffService } from "./services/TextDiffService";
 import { EditorViewPluginAdapter } from "./ui/EditorViewPluginAdapter";
 import { SettingsService } from "./services/SettingsService";
+import {DebounceScheduler} from "./services/DebounceScheduler";
 
 export default class EditorConfigFormatter extends Plugin {
 
@@ -27,9 +28,16 @@ export default class EditorConfigFormatter extends Plugin {
 		);
 
 		const textDiffService = new TextDiffService();
+		const debounceScheduler = new DebounceScheduler();
 
 		this.registerEditorExtension(
-			EditorViewPluginAdapter.create(this, formattingCoordinator, textDiffService, this.settingsService)
+			EditorViewPluginAdapter.create(
+				this,
+				formattingCoordinator,
+				textDiffService,
+				this.settingsService,
+				debounceScheduler
+			)
 		);
 	}
 }

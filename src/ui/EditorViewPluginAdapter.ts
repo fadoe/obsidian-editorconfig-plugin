@@ -4,6 +4,7 @@ import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
 import {MarkdownView, TFile} from "obsidian";
 import {FormattingCoordinator} from "../services/FormattingCoordinator";
 import {SettingsService} from "../services/SettingsService";
+import {DebounceScheduler} from "../services/DebounceScheduler";
 
 export class EditorViewPluginAdapter {
 
@@ -11,50 +12,48 @@ export class EditorViewPluginAdapter {
 		plugin: EditorConfigFormatter,
 		coordinator: FormattingCoordinator,
 		diffService: TextDiffService,
-		settingsService: SettingsService
+		settingsService: SettingsService,
+		debounceScheduler: DebounceScheduler
 	) {
 		return ViewPlugin.fromClass(class {
 
-			private debounceTimer: number | null = null;
 			private isFormatting = false;
-			private lastActivity = 0;
 
 			constructor(private view: EditorView) {}
 
 			update(update: ViewUpdate): void {
+
 				if (this.isFormatting) return;
 
-				const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+				const markdownView =
+					plugin.app.workspace.getActiveViewOfType(MarkdownView);
 				if (!markdownView) return;
 
 				const file = markdownView.file;
 				if (!file) return;
 
 				if (update.docChanged) {
-					this.lastActivity = Date.now();
-
 					if (settingsService.get().formatOnTyping) {
-						this.scheduleFormat(file);
+						debounceScheduler.schedule(
+							"format",
+							() => {
+								void this.formatNow(file, false);
+							},
+							settingsService.get().debounceDelay
+						);
 					}
 				}
 
 				if (update.focusChanged && !this.view.hasFocus) {
 					if (settingsService.get().formatOnBlur) {
+						debounceScheduler.cancel("format");
 						void this.formatNow(file, true);
 					}
 				}
 			}
 
-			private scheduleFormat(file: TFile) {
-				if (this.debounceTimer) {
-					window.clearTimeout(this.debounceTimer);
-				}
-
-				this.debounceTimer = window.setTimeout(() => {
-					if (Date.now() - this.lastActivity >= settingsService.get().debounceDelay) {
-						void this.formatNow(file, false);
-					}
-				}, settingsService.get().debounceDelay);
+			destroy() {
+				debounceScheduler.cancel("format");
 			}
 
 			private async formatNow(
