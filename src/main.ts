@@ -1,7 +1,7 @@
 import {
 	App,
 	Plugin,
-	PluginSettingTab, setIcon,
+	PluginSettingTab,
 	Setting,
 } from "obsidian";
 
@@ -24,9 +24,6 @@ export default class EditorConfigFormatter extends Plugin {
 	settings: EditorConfigPluginSettings;
 
 	async onload() {
-		const item = this.addStatusBarItem();
-		setIcon(item, 'settings');
-
 		await this.loadSettings();
 		this.addSettingTab(new EditorConfigSettingTab(this.app, this));
 		this.registerEditorExtension(EditorViewPluginAdapter.create(this));

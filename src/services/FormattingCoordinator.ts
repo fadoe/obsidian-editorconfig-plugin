@@ -1,10 +1,15 @@
-import { FileSystemAdapter, TFile, Vault } from "obsidian";
+import {FileSystemAdapter, TFile, Vault} from "obsidian";
+import {EditorConfigService} from "./EditorConfigService";
+import {MarkdownFormattingService} from "./MarkdownFormattingService";
 import * as editorconfig from "editorconfig";
-import { MarkdownFormatter } from "../MarkdownFormatter";
 
 export class FormattingCoordinator {
 
-	constructor(private vault: Vault) {}
+	constructor(
+		private vault: Vault,
+		private editorConfigService: EditorConfigService,
+		private formattingService: MarkdownFormattingService
+	) {}
 
 	async format(
 		file: TFile,
@@ -19,13 +24,8 @@ export class FormattingCoordinator {
 		const vaultPath = this.vault.adapter.getBasePath();
 		const filePath = `${vaultPath}/${file.path}`;
 
-		let config: editorconfig.KnownProps;
-
-		try {
-			config = await editorconfig.parse(filePath);
-		} catch {
-			return null;
-		}
+		const config = await this.editorConfigService.getConfig(filePath);
+		if (!config) return null;
 
 		const effectiveConfig: editorconfig.KnownProps = {
 			...config,
@@ -37,8 +37,8 @@ export class FormattingCoordinator {
 				: false,
 		};
 
-		const formatter = new MarkdownFormatter(effectiveConfig);
-		const newContent = formatter.format(content);
+		const newContent =
+			this.formattingService.format(content, effectiveConfig);
 
 		if (newContent === content) {
 			return null;

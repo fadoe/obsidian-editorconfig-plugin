@@ -2,6 +2,8 @@ import type EditorConfigFormatter from "../main";
 import {TextDiffService} from "../services/TextDiffService";
 import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
 import {MarkdownView, TFile} from "obsidian";
+import {EditorConfigService} from "../services/EditorConfigService";
+import {MarkdownFormattingService} from "../services/MarkdownFormattingService";
 import {FormattingCoordinator} from "../services/FormattingCoordinator";
 
 export class EditorViewPluginAdapter {
@@ -57,7 +59,11 @@ export class EditorViewPluginAdapter {
 				this.isFormatting = true;
 
 				try {
-					const coordinator = new FormattingCoordinator(plugin.app.vault);
+					const coordinator = new FormattingCoordinator(
+						plugin.app.vault,
+						new EditorConfigService(),
+						new MarkdownFormattingService()
+					);
 					const currentContent = this.view.state.doc.toString();
 					const newContent = await coordinator.format(
 						file,
