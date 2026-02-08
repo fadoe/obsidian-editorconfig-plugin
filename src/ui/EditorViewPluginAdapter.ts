@@ -15,18 +15,22 @@ export class EditorViewPluginAdapter {
 		settingsService: SettingsService,
 		debounceScheduler: DebounceScheduler
 	) {
+
+		let instanceCounter = 0;
 		return ViewPlugin.fromClass(class {
 
 			private isFormatting = false;
+			private readonly debounceKey: string;
 
-			constructor(private view: EditorView) {}
+			constructor(private view: EditorView) {
+				this.debounceKey = `format-${instanceCounter++}`;
+			}
 
 			update(update: ViewUpdate): void {
 
 				if (this.isFormatting) return;
 
-				const markdownView =
-					plugin.app.workspace.getActiveViewOfType(MarkdownView);
+				const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 				if (!markdownView) return;
 
 				const file = markdownView.file;
@@ -35,7 +39,7 @@ export class EditorViewPluginAdapter {
 				if (update.docChanged) {
 					if (settingsService.get().formatOnTyping) {
 						debounceScheduler.schedule(
-							"format",
+							this.debounceKey,
 							() => {
 								void this.formatNow(file, false);
 							},
@@ -46,14 +50,14 @@ export class EditorViewPluginAdapter {
 
 				if (update.focusChanged && !this.view.hasFocus) {
 					if (settingsService.get().formatOnBlur) {
-						debounceScheduler.cancel("format");
+						debounceScheduler.cancel(this.debounceKey);
 						void this.formatNow(file, true);
 					}
 				}
 			}
 
 			destroy() {
-				debounceScheduler.cancel("format");
+				debounceScheduler.cancel(this.debounceKey);
 			}
 
 			private async formatNow(
