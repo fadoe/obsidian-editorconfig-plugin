@@ -1,8 +1,8 @@
-import * as editorconfig from "editorconfig";
 import type EditorConfigFormatter from "../main";
 import {TextDiffService} from "../services/TextDiffService";
 import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
-import {FileSystemAdapter, MarkdownView, TFile} from "obsidian";
+import {MarkdownView, TFile} from "obsidian";
+import {FormattingCoordinator} from "../services/FormattingCoordinator";
 
 export class EditorViewPluginAdapter {
 
@@ -57,44 +57,22 @@ export class EditorViewPluginAdapter {
 				this.isFormatting = true;
 
 				try {
-					if (!(plugin.app.vault.adapter instanceof FileSystemAdapter)) return;
-
-					const vaultPath = plugin.app.vault.adapter.getBasePath();
-					const filePath = `${vaultPath}/${file.path}`;
-
-					let config: editorconfig.KnownProps;
-
-					try {
-						config = await editorconfig.parse(filePath);
-					} catch {
-						return;
-					}
+					const coordinator = new FormattingCoordinator(plugin.app.vault);
 					const currentContent = this.view.state.doc.toString();
+					const newContent = await coordinator.format(
+						file,
+						currentContent,
+						applyFinalNewline
+					);
 
-					const effectiveConfig = {
-						...config,
-						insert_final_newline: applyFinalNewline
-							? config.insert_final_newline
-							: false,
-						trim_trailing_whitespace: applyFinalNewline
-							? config.trim_trailing_whitespace
-							: false,
-					};
-
-					const { MarkdownFormatter } = await import("../MarkdownFormatter");
-					const formatter = new MarkdownFormatter(effectiveConfig);
-					const newContent = formatter.format(currentContent);
-
-					if (newContent === currentContent) return;
+					if (!newContent) return;
 
 					const diffService = new TextDiffService();
 					const change = diffService.calculate(currentContent, newContent);
 
 					if (!change) return;
 
-					this.view.dispatch({
-						changes: change,
-					});
+					this.view.dispatch({ changes: change });
 
 				} finally {
 					this.isFormatting = false;
