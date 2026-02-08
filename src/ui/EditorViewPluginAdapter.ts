@@ -1,7 +1,8 @@
 import * as editorconfig from "editorconfig";
-import {FileSystemAdapter, MarkdownView, TFile} from "obsidian";
-import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
 import type EditorConfigFormatter from "../main";
+import {TextDiffService} from "../services/TextDiffService";
+import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
+import {FileSystemAdapter, MarkdownView, TFile} from "obsidian";
 
 export class EditorViewPluginAdapter {
 
@@ -86,38 +87,13 @@ export class EditorViewPluginAdapter {
 
 					if (newContent === currentContent) return;
 
-					const oldText = currentContent;
-					const newText = newContent;
+					const diffService = new TextDiffService();
+					const change = diffService.calculate(currentContent, newContent);
 
-					let start = 0;
-					let oldEnd = oldText.length;
-					let newEnd = newText.length;
-
-					while (
-						start < oldEnd &&
-						start < newEnd &&
-						oldText.charCodeAt(start) === newText.charCodeAt(start)
-						) {
-						start++;
-					}
-
-					while (
-						oldEnd > start &&
-						newEnd > start &&
-						oldText.charCodeAt(oldEnd - 1) === newText.charCodeAt(newEnd - 1)
-						) {
-						oldEnd--;
-						newEnd--;
-					}
-
-					if (start === oldEnd && start === newEnd) return;
+					if (!change) return;
 
 					this.view.dispatch({
-						changes: {
-							from: start,
-							to: oldEnd,
-							insert: newText.slice(start, newEnd),
-						},
+						changes: change,
 					});
 
 				} finally {
