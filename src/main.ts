@@ -1,10 +1,9 @@
-import {
-	App,
-	Plugin,
-	PluginSettingTab,
-	Setting,
-} from "obsidian";
+import {App, Plugin, PluginSettingTab, Setting,} from "obsidian";
 
+import {EditorConfigService} from "./services/EditorConfigService";
+import {MarkdownFormattingService} from "./services/MarkdownFormattingService";
+import {FormattingCoordinator} from "./services/FormattingCoordinator";
+import {TextDiffService} from "./services/TextDiffService";
 import {EditorViewPluginAdapter} from "./ui/EditorViewPluginAdapter";
 
 interface EditorConfigPluginSettings {
@@ -26,7 +25,23 @@ export default class EditorConfigFormatter extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.addSettingTab(new EditorConfigSettingTab(this.app, this));
-		this.registerEditorExtension(EditorViewPluginAdapter.create(this));
+
+		const editorConfigService = new EditorConfigService();
+		const markdownFormattingService = new MarkdownFormattingService();
+		const formattingCoordinator = new FormattingCoordinator(
+			this.app.vault,
+			editorConfigService,
+			markdownFormattingService
+		);
+		const textDiffService = new TextDiffService();
+
+		this.registerEditorExtension(
+			EditorViewPluginAdapter.create(
+				this,
+				formattingCoordinator,
+				textDiffService
+			)
+		);
 	}
 
 	async loadSettings() {

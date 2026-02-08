@@ -2,13 +2,15 @@ import type EditorConfigFormatter from "../main";
 import {TextDiffService} from "../services/TextDiffService";
 import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
 import {MarkdownView, TFile} from "obsidian";
-import {EditorConfigService} from "../services/EditorConfigService";
-import {MarkdownFormattingService} from "../services/MarkdownFormattingService";
 import {FormattingCoordinator} from "../services/FormattingCoordinator";
 
 export class EditorViewPluginAdapter {
 
-	static create(plugin: EditorConfigFormatter) {
+	static create(
+		plugin: EditorConfigFormatter,
+		coordinator: FormattingCoordinator,
+		diffService: TextDiffService
+	) {
 		return ViewPlugin.fromClass(class {
 
 			private debounceTimer: number | null = null;
@@ -18,7 +20,6 @@ export class EditorViewPluginAdapter {
 			constructor(private view: EditorView) {}
 
 			update(update: ViewUpdate): void {
-
 				if (this.isFormatting) return;
 
 				const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -48,23 +49,26 @@ export class EditorViewPluginAdapter {
 				}
 
 				this.debounceTimer = window.setTimeout(() => {
-					if (Date.now() - this.lastActivity >= plugin.settings.debounceDelay) {
+					if (
+						Date.now() - this.lastActivity >=
+						plugin.settings.debounceDelay
+					) {
 						void this.formatNow(file, false);
 					}
 				}, plugin.settings.debounceDelay);
 			}
 
-			private async formatNow(file: TFile, applyFinalNewline: boolean) {
+			private async formatNow(
+				file: TFile,
+				applyFinalNewline: boolean
+			) {
 				if (this.isFormatting) return;
 				this.isFormatting = true;
 
 				try {
-					const coordinator = new FormattingCoordinator(
-						plugin.app.vault,
-						new EditorConfigService(),
-						new MarkdownFormattingService()
-					);
-					const currentContent = this.view.state.doc.toString();
+					const currentContent =
+						this.view.state.doc.toString();
+
 					const newContent = await coordinator.format(
 						file,
 						currentContent,
@@ -73,8 +77,10 @@ export class EditorViewPluginAdapter {
 
 					if (!newContent) return;
 
-					const diffService = new TextDiffService();
-					const change = diffService.calculate(currentContent, newContent);
+					const change = diffService.calculate(
+						currentContent,
+						newContent
+					);
 
 					if (!change) return;
 
