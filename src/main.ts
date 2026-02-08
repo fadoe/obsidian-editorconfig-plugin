@@ -1,67 +1,51 @@
-import {App, Plugin, PluginSettingTab, Setting,} from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
-import {EditorConfigService} from "./services/EditorConfigService";
-import {MarkdownFormattingService} from "./services/MarkdownFormattingService";
-import {FormattingCoordinator} from "./services/FormattingCoordinator";
-import {TextDiffService} from "./services/TextDiffService";
-import {EditorViewPluginAdapter} from "./ui/EditorViewPluginAdapter";
-
-interface EditorConfigPluginSettings {
-	formatOnTyping: boolean;
-	formatOnBlur: boolean;
-	debounceDelay: number; // milliseconds
-}
-
-const DEFAULT_SETTINGS: EditorConfigPluginSettings = {
-	formatOnTyping: false,
-	formatOnBlur: true,
-	debounceDelay: 300,
-};
+import { EditorConfigService } from "./services/EditorConfigService";
+import { MarkdownFormattingService } from "./services/MarkdownFormattingService";
+import { FormattingCoordinator } from "./services/FormattingCoordinator";
+import { TextDiffService } from "./services/TextDiffService";
+import { EditorViewPluginAdapter } from "./ui/EditorViewPluginAdapter";
+import { SettingsService } from "./services/SettingsService";
 
 export default class EditorConfigFormatter extends Plugin {
 
-	settings: EditorConfigPluginSettings;
+	private settingsService!: SettingsService;
 
 	async onload() {
-		await this.loadSettings();
-		this.addSettingTab(new EditorConfigSettingTab(this.app, this));
+		this.settingsService = new SettingsService(this);
+		await this.settingsService.load();
+
+		this.addSettingTab(new EditorConfigSettingTab(this.app, this, this.settingsService));
 
 		const editorConfigService = new EditorConfigService();
 		const markdownFormattingService = new MarkdownFormattingService();
+
 		const formattingCoordinator = new FormattingCoordinator(
 			this.app.vault,
 			editorConfigService,
 			markdownFormattingService
 		);
+
 		const textDiffService = new TextDiffService();
 
 		this.registerEditorExtension(
-			EditorViewPluginAdapter.create(
-				this,
-				formattingCoordinator,
-				textDiffService
-			)
+			EditorViewPluginAdapter.create(this, formattingCoordinator, textDiffService, this.settingsService)
 		);
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
 	}
 }
 
 class EditorConfigSettingTab extends PluginSettingTab {
-	plugin: EditorConfigFormatter;
 
-	constructor(app: App, plugin: EditorConfigFormatter) {
+	constructor(
+		app: App,
+		plugin: EditorConfigFormatter,
+		private settingsService: SettingsService
+	) {
 		super(app, plugin);
-		this.plugin = plugin;
 	}
 
 	display(): void {
+
 		const { containerEl } = this;
 		containerEl.empty();
 
@@ -70,10 +54,11 @@ class EditorConfigSettingTab extends PluginSettingTab {
 			.setDesc("Enable formatting while typing (debounced).")
 			.addToggle(toggle =>
 				toggle
-					.setValue(this.plugin.settings.formatOnTyping)
+					.setValue(this.settingsService.get().formatOnTyping)
 					.onChange(async (value) => {
-						this.plugin.settings.formatOnTyping = value;
-						await this.plugin.saveSettings();
+						await this.settingsService.update({
+							formatOnTyping: value
+						});
 					})
 			);
 
@@ -82,10 +67,11 @@ class EditorConfigSettingTab extends PluginSettingTab {
 			.setDesc("Format file when editor loses focus.")
 			.addToggle(toggle =>
 				toggle
-					.setValue(this.plugin.settings.formatOnBlur)
+					.setValue(this.settingsService.get().formatOnBlur)
 					.onChange(async (value) => {
-						this.plugin.settings.formatOnBlur = value;
-						await this.plugin.saveSettings();
+						await this.settingsService.update({
+							formatOnBlur: value
+						});
 					})
 			);
 
@@ -94,12 +80,16 @@ class EditorConfigSettingTab extends PluginSettingTab {
 			.setDesc("Debounce delay in milliseconds (ms).")
 			.addText(text =>
 				text
-					.setValue(String(this.plugin.settings.debounceDelay))
+					.setValue(
+						String(this.settingsService.get().debounceDelay)
+					)
 					.onChange(async (value) => {
 						const parsed = Number(value);
+
 						if (!isNaN(parsed) && parsed >= 0) {
-							this.plugin.settings.debounceDelay = parsed;
-							await this.plugin.saveSettings();
+							await this.settingsService.update({
+								debounceDelay: parsed
+							});
 						}
 					})
 			);

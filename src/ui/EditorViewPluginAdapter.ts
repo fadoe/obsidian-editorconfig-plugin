@@ -3,13 +3,15 @@ import {TextDiffService} from "../services/TextDiffService";
 import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/view";
 import {MarkdownView, TFile} from "obsidian";
 import {FormattingCoordinator} from "../services/FormattingCoordinator";
+import {SettingsService} from "../services/SettingsService";
 
 export class EditorViewPluginAdapter {
 
 	static create(
 		plugin: EditorConfigFormatter,
 		coordinator: FormattingCoordinator,
-		diffService: TextDiffService
+		diffService: TextDiffService,
+		settingsService: SettingsService
 	) {
 		return ViewPlugin.fromClass(class {
 
@@ -31,13 +33,13 @@ export class EditorViewPluginAdapter {
 				if (update.docChanged) {
 					this.lastActivity = Date.now();
 
-					if (plugin.settings.formatOnTyping) {
+					if (settingsService.get().formatOnTyping) {
 						this.scheduleFormat(file);
 					}
 				}
 
 				if (update.focusChanged && !this.view.hasFocus) {
-					if (plugin.settings.formatOnBlur) {
+					if (settingsService.get().formatOnBlur) {
 						void this.formatNow(file, true);
 					}
 				}
@@ -49,13 +51,10 @@ export class EditorViewPluginAdapter {
 				}
 
 				this.debounceTimer = window.setTimeout(() => {
-					if (
-						Date.now() - this.lastActivity >=
-						plugin.settings.debounceDelay
-					) {
+					if (Date.now() - this.lastActivity >= settingsService.get().debounceDelay) {
 						void this.formatNow(file, false);
 					}
-				}, plugin.settings.debounceDelay);
+				}, settingsService.get().debounceDelay);
 			}
 
 			private async formatNow(
@@ -66,26 +65,16 @@ export class EditorViewPluginAdapter {
 				this.isFormatting = true;
 
 				try {
-					const currentContent =
-						this.view.state.doc.toString();
-
-					const newContent = await coordinator.format(
-						file,
-						currentContent,
-						applyFinalNewline
-					);
+					const currentContent = this.view.state.doc.toString();
+					const newContent = await coordinator.format(file, currentContent, applyFinalNewline);
 
 					if (!newContent) return;
 
-					const change = diffService.calculate(
-						currentContent,
-						newContent
-					);
+					const change = diffService.calculate(currentContent, newContent);
 
 					if (!change) return;
 
 					this.view.dispatch({ changes: change });
-
 				} finally {
 					this.isFormatting = false;
 				}
